@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Attendances\Tables;
 
+use App\Filament\Exports\AttendanceExporter;
+use Filament\Actions\ExportAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -14,6 +16,10 @@ class AttendancesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(AttendanceExporter::class),
+            ])
             ->columns([
                 TextColumn::make('user.name')
                     ->searchable(),

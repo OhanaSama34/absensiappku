@@ -2,7 +2,8 @@
 
 namespace App\Filament\Resources\Attendances\Schemas;
 
-use Dom\Text;
+use App\Models\Schedule;
+use Carbon\Carbon;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -10,13 +11,9 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextInputColumn;
 use Illuminate\Support\Facades\Auth;
-use Filament\Resources\Forms\Form;
 use Dotswan\MapPicker\Fields\Map;
-
 
 class AttendanceForm
 {
@@ -35,7 +32,34 @@ class AttendanceForm
                     ->required(),
                 DatePicker::make('attendance_date')
                     ->required(),
-                DateTimePicker::make('check_in_time'),
+                
+            DateTimePicker::make('check_in_time') 
+                ->reactive()
+                ->afterStateUpdated(function ($state, $get, $set) {
+                    $scheduleId = $get('schedule_id');
+
+                    if (! $state || ! $scheduleId) {
+                        $set('is_late', false);
+                        return;
+                    }
+
+                    $schedule = Schedule::find($scheduleId);
+
+                    if (! $schedule || ! $schedule->start_time) {
+                        $set('is_late', false);
+                        return;
+                    }
+
+                    $checkIn   = Carbon::parse($state);
+                    $startTime = Carbon::parse($schedule->start_time)
+                        ->setDate(
+                            $checkIn->year,
+                            $checkIn->month,
+                            $checkIn->day
+                        );
+
+                    $set('is_late', $checkIn->greaterThan($startTime));
+                }),
                 DateTimePicker::make('check_out_time'),
                 TextInput::make('latitude')
                     ->numeric(),
@@ -45,27 +69,22 @@ class AttendanceForm
                 Map::make('location')
                     ->label('Location')
                     ->columnSpanFull()
-                    // Basic Configuration
-                    // ->defaultLocation(latitude: 40.4168, longitude: -3.7038)
-                    // ->draggable(true)
-                    // ->clickable(true) // click to move marker
-                    // ->zoom(15)
-                    // ->minZoom(0)
-                    // ->maxZoom(28)
-                    // ->tilesUrl("https://tile.openstreetmap.de/{z}/{x}/{y}.png")
-                    // ->detectRetina(true)
+
                     ->liveLocation(true, true, 5000)
                     ->showMyLocationButton(true)
-                    // ->boundaries(true, 49.5, -11, 61, 2) // Example for British Isles
+  
                     ->rangeSelectField('distance')
                     ->afterStateUpdated(function ($set, ?array $state): void {
                         $set('latitude', $state['lat']);
                         $set('longitude', $state['lng']);
-                        // $set('geojson', json_encode($state['geojson']));
+ 
                     }),
 
                 Toggle::make('is_late')
-                    ->required(),
+                ->label('Late')
+                ->disabled()
+                ->dehydrated(),
+                
                 Textarea::make('notes')
                     ->columnSpanFull(),
             ]);
